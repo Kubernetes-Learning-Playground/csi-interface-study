@@ -1,0 +1,105 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: mycsi
+  namespace: mycsi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mycsi-driver
+  template:
+    metadata:
+      labels:
+        app: mycsi-driver
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: vm-0-16-centos
+      serviceAccount: mycsi-sa
+      containers:
+        - name: mycsi-driver
+          image: alpine:3.12
+          workingDir: "/app"
+          command: ["./mycsi"]
+          args:
+            - --nodeid=$(KUBE_NODE_NAME)  # 使用环境变量的方式注入
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [ "SYS_ADMIN" ]
+          volumeMounts:
+            - name: kubelet-dir
+              mountPath: /var/lib/kubelet
+              mountPropagation: "Bidirectional"
+            - name: socket-dir
+              mountPath: /csi
+            - name: csiapp
+              mountPath: /app
+        - name: node-driver-registrar
+          # 使用 hub.docker.com  原有地址 需要科学
+          image: projectaccuknox/node-driver-registrar:v2.5.1-eks-1-24-2
+          args:
+            - --csi-address=/csi/csi.sock
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+            - --v=2
+          env:
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/mycsi/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir  # grpc 中需要挂载的文件夹
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+        #livenessprobe
+        - name: liveness-probe
+          image: projectaccuknox/livenessprobe:v2.7.0-eks-1-24-2
+          args:
+            - --csi-address=/csi/csi.sock
+            - --probe-timeout=3s
+            - --health-port=29653
+            - --v=2
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        #csi-provisione
+        - name: csi-provisioner
+          image: projectaccuknox/external-provisioner:v3.3.0-eks-1-24-2
+          args:
+            - "-v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election"
+            - "--leader-election-namespace=kube-system"
+            - "--extra-create-metadata=true"
+          env:
+            - name: ADDRESS
+              value: unix:///csi/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+
+      volumes:
+        - name: kubelet-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/mycsi/
+            type: DirectoryOrCreate
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: Directory
+        - name: csiapp
+          hostPath:
+            path: /root/mycsi
