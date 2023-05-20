@@ -15,11 +15,10 @@ func init() {
 	VolumeSet = make(mock.FakeVolumes, 0)
 }
 
-
 // ControllerService：用于创建、删除以及管理 Volume 存储卷
 // Controller Service (NFS)  "mount –t xxxxxx -- NodeService"
 // 用于实现创建/删除 volume 等 不需要在特定宿主机完成的操作、譬如和云商的API进行交互 以及attach操作等
-type ControllerService struct {}
+type ControllerService struct{}
 
 // ControllerService 对象需要实现csi.ControllerServer接口
 var _ csi.ControllerServer = &ControllerService{}
@@ -47,7 +46,6 @@ func (c *ControllerService) ControllerPublishVolume(ctx context.Context, request
 	klog.Info("publish volume...")
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
-
 
 func (c *ControllerService) ControllerUnpublishVolume(ctx context.Context, request *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	klog.Info("unPublish volume...")
@@ -127,5 +125,3 @@ func (c *ControllerService) ControllerGetVolume(ctx context.Context, request *cs
 		Volume: v,
 	}, nil
 }
-
-

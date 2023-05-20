@@ -6,19 +6,22 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	"os"
 )
 
 // NodeService：用于将 Volume 存储卷挂载到指定的目录中以便 Kubelet 创建容器时使用
 //（需要监听在 /var/lib/kubelet/plugins/[SanitizedCSIDriverName]/csi.sock）
 // 真正的执行 mount、unmount。所以它必须在每台机器上都存在(daemonset)
 type NodeService struct {
-	nodeID string
+	nodeID  string
+	mounter mount.Interface
 }
 
 var _ csi.NodeServer = &NodeService{}
 
 func NewNodeService(nodeID string) *NodeService {
-	return &NodeService{nodeID: nodeID}
+	return &NodeService{nodeID: nodeID, mounter: mount.New("")}
 }
 
 // NodeUnstageVolume NodeStageVolume的逆操作，将一个存储卷从临时目录umount掉
@@ -27,17 +30,50 @@ func (n *NodeService) NodeUnstageVolume(ctx context.Context, request *csi.NodeUn
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+// 远端 nfs server ip地址
+const FixedSourceDir = "10.0.0.8:/home/test"
+
 // NodePublishVolume 将存储卷从临时目录mount到目标目录（pod目录）
 func (n *NodeService) NodePublishVolume(ctx context.Context, request *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	//TODO implement me
+
+	opts := request.GetVolumeCapability().GetMount().GetMountFlags()
+	klog.Infoln("挂载参数：", opts)
+
 	klog.Infof("NodePublishVolume")
+	target := request.GetTargetPath()
+
+	klog.Info("要挂载的目录是:", target)
+	nn, err := n.mounter.IsLikelyNotMountPoint(target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(target, 0755)
+			if err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			nn = true
+		}
+	}
+	if !nn {
+		return &csi.NodePublishVolumeResponse{}, nil
+	}
+	// mount -t nfs xxx:xxx /var/xxx
+	err = n.mounter.Mount(FixedSourceDir, target, "nfs", opts)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	//m := mount.New("")
+	//m.Mount(FixedSourceDir, target, "nfs", opts)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
 // NodeUnpublishVolume 将存储卷从pod目录umount掉
 func (n *NodeService) NodeUnpublishVolume(ctx context.Context, request *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	//TODO implement me
+
 	klog.Infof("NodeUnpublishVolume")
+	err := mount.CleanupMountPoint(request.GetTargetPath(), n.mounter, true)
+	if err != nil {
+		return nil, err
+	}
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
@@ -55,13 +91,27 @@ func (n *NodeService) NodeExpandVolume(ctx context.Context, request *csi.NodeExp
 
 // NodeGetCapabilities 返回Node插件的功能点，如是否支持stage/unstage功能
 func (n *NodeService) NodeGetCapabilities(ctx context.Context, request *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	//TODO implement me
+
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: []*csi.NodeServiceCapability{
 			{
 				Type: &csi.NodeServiceCapability_Rpc{
 					Rpc: &csi.NodeServiceCapability_RPC{
 						Type: csi.NodeServiceCapability_RPC_UNKNOWN,
+					},
+				},
+			},
+			{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+					},
+				},
+			},
+			{
+				Type: &csi.NodeServiceCapability_Rpc{
+					Rpc: &csi.NodeServiceCapability_RPC{
+						Type: csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 					},
 				},
 			},

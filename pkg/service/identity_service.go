@@ -10,11 +10,11 @@ import (
 	Identity Service 身分认证服务
 	NodePlugin 与 ControllerPlugin都必须实现
 	driver-registrar组件会调用此接口把CSI driver 注册到kubelet中
- */
+*/
 
 // IdentityService：用于 Kubernetes 与 CSI 插件协调版本信息
 // 暴露插件的名称和能力
-type IdentityService struct {}
+type IdentityService struct{}
 
 var _ csi.IdentityServer = &IdentityService{}
 
