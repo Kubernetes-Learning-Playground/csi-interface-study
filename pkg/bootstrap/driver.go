@@ -50,5 +50,6 @@ func (d *MyDriver) Start() {
 		klog.Fatalf("Failed to listen: %v", err)
 	}
 	// 启动grpc server
+	klog.Info("grpc server start...")
 	grpcServer.Serve(listener)
 }

@@ -17,6 +17,8 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
+	// TODO : 改成配置文件
+	klog.Info("bootstrap start...")
 	driver := bootstrap.NewMyDriver(nodeID)
 	driver.Start()
 }

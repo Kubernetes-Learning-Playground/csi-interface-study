@@ -14,7 +14,7 @@ spec:
         app: mycsi-driver
     spec:
       nodeSelector:
-        kubernetes.io/hostname: vm-0-16-centos
+        kubernetes.io/hostname: vm-0-12-centos
       serviceAccount: mycsi-sa
       containers:
         - name: mycsi-driver
@@ -102,7 +102,8 @@ spec:
               mountPath: /csi
         # csi-attacher
         # external-attacher还支持快照数据源。
-        # 它是一个sidecar容器，用于监视Kubernetes VolumeAttachment对象并针对驱动程序端点触发CSI ControllerPublish和ControllerUnpublish操作
+        # 它是一个sidecar容器，用于监视Kubernetes VolumeAttachment对象，
+        # 并针对驱动程序端点触发CSI ControllerPublish和ControllerUnpublish操作。
         - name: csi-attacher
           image: longhornio/csi-attacher:v3.4.0
           args:

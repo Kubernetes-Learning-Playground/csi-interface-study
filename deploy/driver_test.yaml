@@ -13,16 +13,18 @@ spec:
       labels:
         app: mycsi-driver
     spec:
+      hostNetwork: true
       nodeSelector:
-        kubernetes.io/hostname: vm-0-16-centos
+        kubernetes.io/hostname: vm-0-12-centos
       serviceAccount: mycsi-sa
       containers:
         - name: mycsi-driver
           image: alpine:3.12
+          imagePullPolicy: "IfNotPresent"
           workingDir: "/app"
           command: ["./mycsi"]
           args:
-            - --nodeid=$(KUBE_NODE_NAME)  # 使用环境变量的方式注入
+            - --nodeid=$(KUBE_NODE_NAME)
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -43,6 +45,7 @@ spec:
         - name: node-driver-registrar
           # 使用 hub.docker.com  原有地址 需要科学
           image: projectaccuknox/node-driver-registrar:v2.5.1-eks-1-24-2
+          imagePullPolicy: "IfNotPresent"
           args:
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
@@ -55,13 +58,14 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
           volumeMounts:
-            - name: socket-dir  # grpc 中需要挂载的文件夹
+            - name: socket-dir
               mountPath: /csi
             - name: registration-dir
               mountPath: /registration
         #livenessprobe
         - name: liveness-probe
           image: projectaccuknox/livenessprobe:v2.7.0-eks-1-24-2
+          imagePullPolicy: "IfNotPresent"
           args:
             - --csi-address=/csi/csi.sock
             - --probe-timeout=3s
@@ -74,7 +78,7 @@ spec:
         - name: csi-provisioner
           image: projectaccuknox/external-provisioner:v3.3.0-eks-1-24-2
           args:
-            - "-v=2"
+            - "--v=2"
             - "--csi-address=$(ADDRESS)"
             - "--leader-election"
             - "--leader-election-namespace=kube-system"
@@ -86,7 +90,18 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
-
+        - name: csi-attacher
+          image: longhornio/csi-attacher:v3.4.0
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
       volumes:
         - name: kubelet-dir
           hostPath:

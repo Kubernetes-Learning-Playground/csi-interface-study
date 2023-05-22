@@ -21,4 +21,4 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: nfs-csi
+  storageClassName: nfs-csi        # 指定的storageClass
