@@ -45,6 +45,7 @@ func (n *NodeService) NodePublishVolume(ctx context.Context, request *csi.NodePu
 	klog.Info("要挂载的目录是:", target)
 	nn, err := n.mounter.IsLikelyNotMountPoint(target)
 	if err != nil {
+		// 如果不存在，创建
 		if os.IsNotExist(err) {
 			err = os.MkdirAll(target, 0755)
 			if err != nil {
@@ -56,20 +57,20 @@ func (n *NodeService) NodePublishVolume(ctx context.Context, request *csi.NodePu
 	if !nn {
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
-	// mount -t nfs xxx:xxx /var/xxx
+	// mount -t nfs xxx:xxx(远端nfs server目录) /var/xxx(本地节点目录)
 	err = n.mounter.Mount(FixedSourceDir, target, "nfs", opts)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	//m := mount.New("")
-	//m.Mount(FixedSourceDir, target, "nfs", opts)
+
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-// NodeUnpublishVolume 将存储卷从pod目录umount掉
+// NodeUnpublishVolume 将存储卷从pod目录unmount掉
 func (n *NodeService) NodeUnpublishVolume(ctx context.Context, request *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 
 	klog.Infof("NodeUnpublishVolume")
+	// 把nfs目录unmount掉
 	err := mount.CleanupMountPoint(request.GetTargetPath(), n.mounter, true)
 	if err != nil {
 		return nil, err

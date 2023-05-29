@@ -24,12 +24,13 @@ spec:
   selector:
     matchLabels:
       app: mycsi-nginx
-  replicas: 2 # 告知 Deployment 运行 2 个与该模板匹配的 Pod
+  replicas: 1 # 告知 Deployment 运行 2 个与该模板匹配的 Pod
   template:
     metadata:
       labels:
         app: mycsi-nginx
     spec:
+      nodeName: vm-0-12-centos
       containers:
         - name: nginx
           image: nginx:1.14.2

@@ -13,8 +13,10 @@ spec:
       labels:
         app: mycsi-driver
     spec:
+      hostNetwork: true
       nodeSelector:
         kubernetes.io/hostname: vm-0-12-centos
+      nodeName: vm-0-12-centos
       serviceAccount: mycsi-sa
       containers:
         - name: mycsi-driver
@@ -76,7 +78,7 @@ spec:
           args:
             - --csi-address=/csi/csi.sock
             - --probe-timeout=3s
-            - --health-port=29653
+            - --health-port=29655
             - --v=2
           volumeMounts:
             - name: socket-dir

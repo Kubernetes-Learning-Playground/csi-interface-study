@@ -7,6 +7,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	"os"
+	"strings"
 )
 
 var VolumeSet mock.FakeVolumes
@@ -18,7 +21,9 @@ func init() {
 // ControllerService：用于创建、删除以及管理 Volume 存储卷
 // Controller Service (NFS)  "mount –t xxxxxx -- NodeService"
 // 用于实现创建/删除 volume 等 不需要在特定宿主机完成的操作、譬如和云商的API进行交互 以及attach操作等
-type ControllerService struct{}
+type ControllerService struct{
+	mounter mount.Interface //依然要初始化这个
+}
 
 // ControllerService 对象需要实现csi.ControllerServer接口
 var _ csi.ControllerServer = &ControllerService{}
@@ -28,9 +33,54 @@ func NewControllerService() *ControllerService {
 }
 
 // CreateVolume 创建存储卷
-func (*ControllerService) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (cs *ControllerService) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	klog.Info("create volume...")
+
+	basePath := "172.17.70.145:/home/shenyi/nfsdata" //  根目录
+	tmpPath := "/tmp/"
+	volCap := &csi.VolumeCapability{
+		AccessType: &csi.VolumeCapability_Mount{
+			Mount: &csi.VolumeCapability_MountVolume{},
+		},
+	}
+	opts := volCap.GetMount().GetMountFlags()
+	// TODO 本课程来自 程序员在囧途(www.jtthink.com) 咨询群：98514334
+	//下面是检查目录
+	nn, err := cs.mounter.IsLikelyNotMountPoint(tmpPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(tmpPath, 0777)
+			if err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			nn = true
+		}
+	}
+	if !nn {
+		return nil, status.Error(codes.Internal, "无法处理tmp目录进行临时挂载")
+	}
+
+	//挂载到临时目录
+	err = cs.mounter.Mount(basePath, tmpPath, "nfs", opts)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	defer func() {
+		err := mount.CleanupMountPoint(tmpPath, cs.mounter, true)
+		if err != nil {
+			klog.Warningf("cs 反挂出错", err)
+		}
+	}()
+	//一旦挂载成功， 那我们就可以再/tmp/pvc-xxx-xx-x-
+	if err = os.Mkdir(tmpPath+req.GetName(), 0777); err != nil && !os.IsExist(err) {
+		return nil, status.Errorf(codes.Internal, "failed to make subdirectory: %v", err.Error())
+	}
+
 	return &csi.CreateVolumeResponse{
-		Volume: VolumeSet.Create(),
+		Volume: &csi.Volume{
+			VolumeId:      "jtthink-volume-" + req.GetName(),
+			CapacityBytes: 0,
+		},
 	}, nil
 }
 
@@ -124,4 +174,108 @@ func (c *ControllerService) ControllerGetVolume(ctx context.Context, request *cs
 	return &csi.ControllerGetVolumeResponse{
 		Volume: v,
 	}, nil
+}
+
+
+// ////////////////////////////////以下是自定义函数
+
+const (
+	paramServer           = "server"
+	paramShare            = "share"
+	paramSubDir           = "subdir"
+	mountOptionsField     = "mountoptions"
+	mountPermissionsField = "mountpermissions"
+	pvcNameKey            = "csi.storage.k8s.io/pvc/name"
+	pvcNamespaceKey       = "csi.storage.k8s.io/pvc/namespace"
+	pvNameKey             = "csi.storage.k8s.io/pv/name"
+	pvcNameMetadata       = "${pvc.metadata.name}"
+	pvcNamespaceMetadata  = "${pvc.metadata.namespace}"
+	pvNameMetadata        = "${pv.metadata.name}"
+	separator             = "#"
+)
+
+type nfsVolume struct {
+	// Volume id
+	id string
+	// Address of the NFS server.
+	// Matches paramServer.
+	server string
+	// Base directory of the NFS server to create volumes under
+	// Matches paramShare.
+	baseDir string
+	// Subdirectory of the NFS server to create volumes under
+	subDir string
+	// size of volume
+	size int64
+	// pv name when subDir is not empty
+	uuid string
+}
+
+const (
+	idServer = iota
+	idBaseDir
+	idSubDir
+	idUUID
+	totalIDElements // Always last
+)
+
+func replaceWithMap(str string, m map[string]string) string {
+	for k, v := range m {
+		if k != "" {
+			str = strings.ReplaceAll(str, k, v)
+		}
+	}
+	return str
+}
+
+// 官方的一个 拼凑ID的方式
+func getVolumeIDFromNfsVol(vol *nfsVolume) string {
+	idElements := make([]string, totalIDElements)
+	idElements[idServer] = strings.Trim(vol.server, "/")
+	idElements[idBaseDir] = strings.Trim(vol.baseDir, "/")
+	idElements[idSubDir] = strings.Trim(vol.subDir, "/")
+	idElements[idUUID] = vol.uuid
+	return strings.Join(idElements, separator)
+}
+func newNFSVolume(name string, size int64, params map[string]string) (*nfsVolume, error) {
+	var server, baseDir, subDir string
+	subDirReplaceMap := map[string]string{}
+
+	for k, v := range params {
+		switch strings.ToLower(k) {
+		case paramServer:
+			server = v
+		case paramShare:
+			baseDir = v
+		case paramSubDir:
+			subDir = v
+		case pvcNamespaceKey:
+			subDirReplaceMap[pvcNamespaceMetadata] = v
+		case pvcNameKey:
+			subDirReplaceMap[pvcNameMetadata] = v
+		case pvNameKey:
+			subDirReplaceMap[pvNameMetadata] = v
+		}
+	}
+
+	if server == "" {
+		return nil, fmt.Errorf("%v is a required parameter", paramServer)
+	}
+
+	vol := &nfsVolume{
+		server:  server,
+		baseDir: baseDir,
+		size:    size,
+	}
+	if subDir == "" {
+		// use pv name by default if not specified
+		vol.subDir = name
+	} else {
+		// replace pv/pvc name namespace metadata in subDir
+		vol.subDir = replaceWithMap(subDir, subDirReplaceMap)
+		// make volume id unique if subDir is provided
+		vol.uuid = name
+	}
+	vol.id = getVolumeIDFromNfsVol(vol)
+	return vol, nil
 }
