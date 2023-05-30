@@ -33,7 +33,7 @@ func (n *NodeService) NodeUnstageVolume(ctx context.Context, request *csi.NodeUn
 // 远端 nfs server ip地址
 const FixedSourceDir = "10.0.0.8:/home/test"
 
-// NodePublishVolume 将存储卷从临时目录mount到目标目录（pod目录）
+// NodePublishVolume 将存储卷从临时目录 mount 到目标目录（pod目录） (Mount操作)
 func (n *NodeService) NodePublishVolume(ctx context.Context, request *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 
 	opts := request.GetVolumeCapability().GetMount().GetMountFlags()
@@ -85,9 +85,9 @@ func (n *NodeService) NodeGetVolumeStats(ctx context.Context, request *csi.NodeG
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-// NodeExpandVolume node上执行卷扩容
+// NodeExpandVolume node上执行卷扩容，在节点上扩容文件系统等
 func (n *NodeService) NodeExpandVolume(ctx context.Context, request *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	//TODO implement me
+
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
@@ -123,7 +123,7 @@ func (n *NodeService) NodeGetCapabilities(ctx context.Context, request *csi.Node
 
 // NodeGetInfo 获取节点信息
 func (n *NodeService) NodeGetInfo(ctx context.Context, request *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	//TODO implement me
+
 	klog.Infoln("NodeGetInfo")
 	return &csi.NodeGetInfoResponse{
 		NodeId: n.nodeID,
@@ -131,12 +131,11 @@ func (n *NodeService) NodeGetInfo(ctx context.Context, request *csi.NodeGetInfoR
 }
 
 // NodeStageVolume 如果存储卷没有格式化，首先要格式化。
-// 然后把存储卷mount到一个临时的目录（这个目录通常是节点上的一个全局目录）。
-// 再通过NodePublishVolume将存储卷mount到pod的目录中。
-// mount过程分为2步，原因是为了支持多个pod共享同一个volume（如NFS）。
-// 如果使用云盘，
-// 就会将云硬盘格式化成对应文件系统 将volume mount到一个全局的目录
+// 然后把存储卷 mount 到一个临时的目录（这个目录通常是节点上的一个全局目录）。
+// 再通过 NodePublishVolume 将存储卷 mount 到 pod 的目录中。
+// mount过程分为2步，原因是为了支持多个 pod 共享同一个 volume（如NFS）。
+// 如果使用云盘，就会将云硬盘格式化成对应文件系统 将volume mount到一个全局的目录
 func (n *NodeService) NodeStageVolume(ctx context.Context, request *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	//TODO implement me
+
 	return nil, status.Error(codes.Unimplemented, "")
 }

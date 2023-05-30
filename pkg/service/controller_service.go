@@ -33,7 +33,7 @@ func NewControllerService() *ControllerService {
 	return &ControllerService{mounter: mount.New("")}
 }
 
-// CreateVolume 创建存储卷
+// CreateVolume 创建存储卷 (Provision操作)
 func (cs *ControllerService) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	klog.Info("create volume...")
 	klog.Info("volume name: ", req.GetName())
@@ -96,18 +96,20 @@ func (cs *ControllerService) DeleteVolume(ctx context.Context, request *csi.Dele
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
-// ControllerPublishVolume 发布存储卷
+// ControllerPublishVolume 挂载存储卷 (Attach操作)
+// 将存储卷挂载到目标节点上
 func (cs *ControllerService) ControllerPublishVolume(ctx context.Context, request *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	klog.Info("publish volume...")
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
+// ControllerUnpublishVolume 卸载存储卷
 func (cs *ControllerService) ControllerUnpublishVolume(ctx context.Context, request *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	klog.Info("unPublish volume...")
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
-// ValidateVolumeCapabilities 验证存储卷
+// ValidateVolumeCapabilities 验证Controller信息
 func (cs *ControllerService) ValidateVolumeCapabilities(ctx context.Context, request *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ValidateVolumeCapabilities not implemented")
 }
@@ -149,13 +151,13 @@ func (cs *ControllerService) ControllerGetCapabilities(ctx context.Context, requ
 	}, nil
 }
 
-// CreateSnapshot 创建快照
+// CreateSnapshot 创建存储卷快照，并创建快照对象(VolumeSnapshot)
 func (cs *ControllerService) CreateSnapshot(ctx context.Context, request *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateSnapshot not implemented")
 
 }
 
-// DeleteSnapshot 删除快照
+// DeleteSnapshot 删除存储卷快照
 func (cs *ControllerService) DeleteSnapshot(ctx context.Context, request *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSnapshot not implemented")
 }
