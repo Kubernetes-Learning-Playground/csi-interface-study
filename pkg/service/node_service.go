@@ -45,8 +45,9 @@ func (n *NodeService) NodePublishVolume(ctx context.Context, request *csi.NodePu
 	klog.Info("要挂载的目录是:", target)
 	nn, err := n.mounter.IsLikelyNotMountPoint(target)
 	if err != nil {
-		// 如果不存在，创建
+		// 如果不存在，创建目录
 		if os.IsNotExist(err) {
+			klog.Info("如果没有，需要创建:", target)
 			err = os.MkdirAll(target, 0755)
 			if err != nil {
 				return nil, status.Error(codes.Internal, err.Error())

@@ -28,7 +28,7 @@ func (d *MyDriver) Start() {
 	nodeSvc := service.NewNodeService(d.NodeId)
 
 	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(DumpLog), // 类似插件
+		//grpc.UnaryInterceptor(DumpLog), // 类似插件
 	}
 
 	// grpc服务

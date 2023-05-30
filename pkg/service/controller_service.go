@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golanglearning/new_project/csi_practice/pkg/service/mock"
 	"google.golang.org/grpc/codes"
@@ -21,7 +22,7 @@ func init() {
 // ControllerService：用于创建、删除以及管理 Volume 存储卷
 // Controller Service (NFS)  "mount –t xxxxxx -- NodeService"
 // 用于实现创建/删除 volume 等 不需要在特定宿主机完成的操作、譬如和云商的API进行交互 以及attach操作等
-type ControllerService struct{
+type ControllerService struct {
 	mounter mount.Interface //依然要初始化这个
 }
 
@@ -29,14 +30,17 @@ type ControllerService struct{
 var _ csi.ControllerServer = &ControllerService{}
 
 func NewControllerService() *ControllerService {
-	return &ControllerService{}
+	return &ControllerService{mounter: mount.New("")}
 }
 
 // CreateVolume 创建存储卷
 func (cs *ControllerService) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	klog.Info("create volume...")
+	klog.Info("volume name: ", req.GetName())
+	klog.Info("param: ", req.GetParameters())
 
-	basePath := "172.17.70.145:/home/shenyi/nfsdata" //  根目录
+	// TODO: 改成可配置 storageClass中配置
+	basePath := "10.0.0.8:/home/test" //  根目录
 	tmpPath := "/tmp/"
 	volCap := &csi.VolumeCapability{
 		AccessType: &csi.VolumeCapability_Mount{
@@ -44,11 +48,12 @@ func (cs *ControllerService) CreateVolume(ctx context.Context, req *csi.CreateVo
 		},
 	}
 	opts := volCap.GetMount().GetMountFlags()
-	// TODO 本课程来自 程序员在囧途(www.jtthink.com) 咨询群：98514334
-	//下面是检查目录
+
+	// 检查目录
 	nn, err := cs.mounter.IsLikelyNotMountPoint(tmpPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			klog.Info("如果没有，需要创建:", tmpPath)
 			err = os.MkdirAll(tmpPath, 0777)
 			if err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
@@ -60,7 +65,7 @@ func (cs *ControllerService) CreateVolume(ctx context.Context, req *csi.CreateVo
 		return nil, status.Error(codes.Internal, "无法处理tmp目录进行临时挂载")
 	}
 
-	//挂载到临时目录
+	// 挂载到临时目录
 	err = cs.mounter.Mount(basePath, tmpPath, "nfs", opts)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -85,30 +90,30 @@ func (cs *ControllerService) CreateVolume(ctx context.Context, req *csi.CreateVo
 }
 
 // DeleteVolume 删除存储卷
-func (c *ControllerService) DeleteVolume(ctx context.Context, request *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+func (cs *ControllerService) DeleteVolume(ctx context.Context, request *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	klog.Info("delete volume...")
 	VolumeSet.Delete(request.VolumeId)
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 // ControllerPublishVolume 发布存储卷
-func (c *ControllerService) ControllerPublishVolume(ctx context.Context, request *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+func (cs *ControllerService) ControllerPublishVolume(ctx context.Context, request *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	klog.Info("publish volume...")
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
-func (c *ControllerService) ControllerUnpublishVolume(ctx context.Context, request *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (cs *ControllerService) ControllerUnpublishVolume(ctx context.Context, request *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	klog.Info("unPublish volume...")
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 // ValidateVolumeCapabilities 验证存储卷
-func (c *ControllerService) ValidateVolumeCapabilities(ctx context.Context, request *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+func (cs *ControllerService) ValidateVolumeCapabilities(ctx context.Context, request *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ValidateVolumeCapabilities not implemented")
 }
 
 // ListVolumes 列出存储卷
-func (c *ControllerService) ListVolumes(ctx context.Context, request *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+func (cs *ControllerService) ListVolumes(ctx context.Context, request *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	klog.Info("list volume...")
 	return &csi.ListVolumesResponse{
 		Entries: VolumeSet.List(),
@@ -116,14 +121,14 @@ func (c *ControllerService) ListVolumes(ctx context.Context, request *csi.ListVo
 }
 
 // GetCapacity 存储卷可用量信息
-func (c *ControllerService) GetCapacity(ctx context.Context, request *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+func (cs *ControllerService) GetCapacity(ctx context.Context, request *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
 	return &csi.GetCapacityResponse{
 		AvailableCapacity: 100 * 1024 * 1024,
 	}, nil
 }
 
 // ControllerGetCapabilities controller插件的功能点，如是否支持GetCapacity接口，是否支持snapshot功能等
-func (c *ControllerService) ControllerGetCapabilities(ctx context.Context, request *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+func (cs *ControllerService) ControllerGetCapabilities(ctx context.Context, request *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	capList := []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME, //删除和创建volume
 		//csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME, // 包含attach过程
@@ -145,28 +150,28 @@ func (c *ControllerService) ControllerGetCapabilities(ctx context.Context, reque
 }
 
 // CreateSnapshot 创建快照
-func (c *ControllerService) CreateSnapshot(ctx context.Context, request *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
+func (cs *ControllerService) CreateSnapshot(ctx context.Context, request *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateSnapshot not implemented")
 
 }
 
 // DeleteSnapshot 删除快照
-func (c *ControllerService) DeleteSnapshot(ctx context.Context, request *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
+func (cs *ControllerService) DeleteSnapshot(ctx context.Context, request *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSnapshot not implemented")
 }
 
 // ListSnapshots 列出快照
-func (c ControllerService) ListSnapshots(ctx context.Context, request *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+func (cs ControllerService) ListSnapshots(ctx context.Context, request *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListSnapshots not implemented")
 }
 
 // ControllerExpandVolume 扩容
-func (c *ControllerService) ControllerExpandVolume(ctx context.Context, request *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+func (cs *ControllerService) ControllerExpandVolume(ctx context.Context, request *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ControllerExpandVolume not implemented")
 }
 
 // ControllerGetVolume 获得卷
-func (c *ControllerService) ControllerGetVolume(ctx context.Context, request *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+func (cs *ControllerService) ControllerGetVolume(ctx context.Context, request *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	v, err := VolumeSet.Get(request.VolumeId)
 	if err != nil {
 		return nil, err
@@ -175,7 +180,6 @@ func (c *ControllerService) ControllerGetVolume(ctx context.Context, request *cs
 		Volume: v,
 	}, nil
 }
-
 
 // ////////////////////////////////以下是自定义函数
 
