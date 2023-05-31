@@ -1,4 +1,4 @@
-module golanglearning/new_project/csi_practice
+module github/mycsi/csi_practice
 
 go 1.18
 

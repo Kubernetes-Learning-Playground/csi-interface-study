@@ -11,17 +11,17 @@ import (
 )
 
 // NodeService：用于将 Volume 存储卷挂载到指定的目录中以便 Kubelet 创建容器时使用
-//（需要监听在 /var/lib/kubelet/plugins/[SanitizedCSIDriverName]/csi.sock）
+// （需要监听在 /var/lib/kubelet/plugins/[SanitizedCSIDriverName]/csi.sock）
 // 真正的执行 mount、unmount。所以它必须在每台机器上都存在(daemonset)
 type NodeService struct {
-	nodeID  string
-	mounter mount.Interface
+	myDriver *MyDriver
+	mounter  mount.Interface
 }
 
 var _ csi.NodeServer = &NodeService{}
 
-func NewNodeService(nodeID string) *NodeService {
-	return &NodeService{nodeID: nodeID, mounter: mount.New("")}
+func NewNodeService(driver *MyDriver) *NodeService {
+	return &NodeService{myDriver: driver, mounter: mount.New("")}
 }
 
 // NodeUnstageVolume NodeStageVolume的逆操作，将一个存储卷从临时目录umount掉
@@ -87,46 +87,21 @@ func (n *NodeService) NodeGetVolumeStats(ctx context.Context, request *csi.NodeG
 
 // NodeExpandVolume node上执行卷扩容，在节点上扩容文件系统等
 func (n *NodeService) NodeExpandVolume(ctx context.Context, request *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
 // NodeGetCapabilities 返回Node插件的功能点，如是否支持stage/unstage功能
 func (n *NodeService) NodeGetCapabilities(ctx context.Context, request *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-
 	return &csi.NodeGetCapabilitiesResponse{
-		Capabilities: []*csi.NodeServiceCapability{
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_UNKNOWN,
-					},
-				},
-			},
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
-					},
-				},
-			},
-			{
-				Type: &csi.NodeServiceCapability_Rpc{
-					Rpc: &csi.NodeServiceCapability_RPC{
-						Type: csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
-					},
-				},
-			},
-		},
+		Capabilities: n.myDriver.Nscap,
 	}, nil
 }
 
 // NodeGetInfo 获取节点信息
 func (n *NodeService) NodeGetInfo(ctx context.Context, request *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-
 	klog.Infoln("NodeGetInfo")
 	return &csi.NodeGetInfoResponse{
-		NodeId: n.nodeID,
+		NodeId: n.myDriver.NodeID,
 	}, nil
 }
 

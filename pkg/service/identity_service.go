@@ -4,27 +4,31 @@ import (
 	"context"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 /*
-	Identity Service 身分认证服务
-	NodePlugin 与 ControllerPlugin都必须实现
-	driver-registrar组件会调用此接口把CSI driver 注册到kubelet中
+ Identity Service 身分认证服务
+ NodePlugin 与 ControllerPlugin都必须实现
+ driver-registrar组件会调用此接口把CSI driver 注册到kubelet中
 */
 
-// IdentityService：用于 Kubernetes 与 CSI 插件协调版本信息
+// IdentityService: 用于 Kubernetes 与 CSI 插件协调版本信息
 // 暴露插件的名称和能力
-type IdentityService struct{}
+type IdentityService struct {
+	myDriver *MyDriver
+}
 
 var _ csi.IdentityServer = &IdentityService{}
 
-func NewIdentityService() *IdentityService {
-	return &IdentityService{}
+func NewIdentityService(driver *MyDriver) *IdentityService {
+	return &IdentityService{myDriver: driver}
 }
 
 // GetPluginCapabilities 返回driver提供的能力，比如是否提供 Controller Service,volume 访问能能力
 func (i *IdentityService) GetPluginCapabilities(ctx context.Context, request *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	//TODO implement me
+
 	capList := []csi.PluginCapability_Service_Type{
 		csi.PluginCapability_Service_CONTROLLER_SERVICE,
 		csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
@@ -48,18 +52,23 @@ func (i *IdentityService) GetPluginCapabilities(ctx context.Context, request *cs
 
 // Probe 探针
 func (i *IdentityService) Probe(ctx context.Context, request *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	status := wrappers.BoolValue{Value: true}
-	//TODO implement me
+	s := wrappers.BoolValue{Value: true}
 	return &csi.ProbeResponse{
-		Ready: &status,
+		Ready: &s,
 	}, nil
 }
 
 // GetPluginInfo 返回driver的信息
 func (i *IdentityService) GetPluginInfo(ctx context.Context, request *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	//TODO implement me
+	if i.myDriver.Name == "" {
+		return nil, status.Error(codes.Unavailable, "Driver name not configured")
+	}
+
+	if i.myDriver.Version == "" {
+		return nil, status.Error(codes.Unavailable, "Driver is missing version")
+	}
 	return &csi.GetPluginInfoResponse{
-		Name:          "mycsi.jtthink.com",
-		VendorVersion: "v1.0",
+		Name:          i.myDriver.Name,
+		VendorVersion: i.myDriver.Version,
 	}, nil
 }

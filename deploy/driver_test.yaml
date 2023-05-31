@@ -40,8 +40,6 @@ spec:
               mountPropagation: "Bidirectional"
             - name: socket-dir
               mountPath: /csi
-            - name: csiapp
-              mountPath: /app
         - name: node-driver-registrar
           # 使用 hub.docker.com  原有地址 需要科学
           image: projectaccuknox/node-driver-registrar:v2.5.1-eks-1-24-2
