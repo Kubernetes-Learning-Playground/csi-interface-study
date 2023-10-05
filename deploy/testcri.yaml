@@ -2,7 +2,10 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: mycsi-sc
-provisioner: mycsi.practice.com
+provisioner: mycsi.practice.com   # 需要指定的provisioner，会依赖这个找到第三方插件
+parameters:
+  server: 10.0.0.8                # nfs 服务器地址
+  share: /home/test               # 共享目录
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -13,8 +16,8 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 2Gi  # 不能超过10Gi，代码写死
-  storageClassName: mycsi-sc
+      storage: 2Gi            # 不能超过10Gi，代码写死
+  storageClassName: mycsi-sc  # 需要指定此 StorageClass
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -30,6 +33,7 @@ spec:
       labels:
         app: mycsi-nginx
     spec:
+      # 只支持在此节点上调度，因为drive服务只在vm-0-12-centos部署
       nodeName: vm-0-12-centos
       containers:
         - name: nginx
@@ -41,5 +45,5 @@ spec:
               mountPath: "/data"
       volumes:
         - name: data
-          persistentVolumeClaim: # 使用pvc挂载
+          persistentVolumeClaim: # 指定使用的pvc挂载
             claimName: mycsi-pvc

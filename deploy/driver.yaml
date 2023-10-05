@@ -15,15 +15,14 @@ spec:
     spec:
       hostNetwork: true
       nodeSelector:
-        kubernetes.io/hostname: vm-0-12-centos
-      nodeName: vm-0-12-centos
+        kubernetes.io/hostname: vm-0-12-centos  # 指定 node
+      nodeName: vm-0-12-centos                  # 指定 node
       serviceAccount: mycsi-sa
       containers:
         - name: mycsi-driver
-          image: alpine:3.12
+          image: mycsi:v1
           imagePullPolicy: "IfNotPresent"
           workingDir: "/app"
-          command: ["./mycsi"]
           args:
             - --nodeid=$(KUBE_NODE_NAME)
           env:
@@ -41,10 +40,7 @@ spec:
               mountPropagation: "Bidirectional"
             - name: socket-dir
               mountPath: /csi
-            - name: csiapp
-              mountPath: /app
         # k8s api跟csi driver的桥梁：External 组件
-
         # node-driver-registrar
         # CSI node-driver-registrar是一个sidecar容器，
         # 可从CSI driver获取驱动程序信息（使用NodeGetInfo），并使用kubelet插件注册机制在该节点上的kubelet中对其进行注册。
@@ -119,6 +115,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
       volumes:
+        # 本机上 kubelet 目录
         - name: kubelet-dir
           hostPath:
             path: /var/lib/kubelet
@@ -131,6 +128,3 @@ spec:
           hostPath:
             path: /var/lib/kubelet/plugins_registry/
             type: Directory
-        - name: csiapp
-          hostPath:
-            path: /root/mycsi

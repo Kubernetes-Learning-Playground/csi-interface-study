@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// 已经废弃
+
 type FakeVolumes []*csi.Volume
 
 func (fv FakeVolumes) Delete(id string) {
@@ -30,7 +32,7 @@ func (fv FakeVolumes) List() []*csi.ListVolumesResponse_Entry {
 
 func (fv FakeVolumes) Create() *csi.Volume {
 	v := &csi.Volume{
-		VolumeId:      "jtthink-volume-" + time.Now().Format("20060102150405"),
+		VolumeId:      "my-nfs-csi-volume-" + time.Now().Format("20060102150405"),
 		CapacityBytes: 10 * 1024 * 1024 * 1024, //统一 使用 10G
 	}
 	fv = append(fv, v)
@@ -44,5 +46,4 @@ func (fv FakeVolumes) Get(id string) (*csi.Volume, error) {
 		}
 	}
 	return nil, status.Errorf(codes.NotFound, "found no volume")
-
 }

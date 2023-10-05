@@ -13,15 +13,18 @@ var (
 )
 
 const (
+	// DefaultDriverName csi 默认插件名称，使用 mycsi.practice.com
 	DefaultDriverName = "mycsi.practice.com"
+	DefaultEndpoint   = "unix:///csi/csi.sock"
+	DefaultNodeID     = "node1"
 )
 
 func main() {
 
 	// 节点名由外部注入
-	flag.StringVar(&nodeID, "nodeid", "", "--nodeid=xxx")
-	flag.StringVar(&endpoint, "endpoint", "unix:///csi/csi.sock", "CSI endpoint")
-	flag.StringVar(&driverName, "drivername", DefaultDriverName, "name of the driver")
+	flag.StringVar(&nodeID, "nodeid", DefaultNodeID, "--nodeid=xxx, node name")
+	flag.StringVar(&endpoint, "endpoint", DefaultEndpoint, "--endpoint=xxx, CSI endpoint, ex: unix:///csi/csi.sock")
+	flag.StringVar(&driverName, "drivername", DefaultDriverName, "--drivername=xxx, csi driver name")
 	klog.InitFlags(nil)
 	flag.Parse()
 

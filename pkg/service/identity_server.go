@@ -9,26 +9,25 @@ import (
 )
 
 /*
- Identity Service 身分认证服务
- NodePlugin 与 ControllerPlugin都必须实现
+ Identity Server 身分认证服务
+ NodePlugin 与 ControllerPlugin 都必须实现
  driver-registrar组件会调用此接口把CSI driver 注册到kubelet中
 */
 
-// IdentityService: 用于 Kubernetes 与 CSI 插件协调版本信息
+// IdentityServer 用于 Kubernetes 与 CSI 插件协调版本信息
 // 暴露插件的名称和能力
-type IdentityService struct {
+type IdentityServer struct {
 	myDriver *MyDriver
 }
 
-var _ csi.IdentityServer = &IdentityService{}
+var _ csi.IdentityServer = &IdentityServer{}
 
-func NewIdentityService(driver *MyDriver) *IdentityService {
-	return &IdentityService{myDriver: driver}
+func NewIdentityService(driver *MyDriver) *IdentityServer {
+	return &IdentityServer{myDriver: driver}
 }
 
-// GetPluginCapabilities 返回driver提供的能力，比如是否提供 Controller Service,volume 访问能能力
-func (i *IdentityService) GetPluginCapabilities(ctx context.Context, request *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-
+// GetPluginCapabilities 返回driver提供的能力，比如是否提供 ControllerServer,volume 访问能力
+func (i *IdentityServer) GetPluginCapabilities(ctx context.Context, request *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	capList := []csi.PluginCapability_Service_Type{
 		csi.PluginCapability_Service_CONTROLLER_SERVICE,
 		csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
@@ -47,11 +46,10 @@ func (i *IdentityService) GetPluginCapabilities(ctx context.Context, request *cs
 	return &csi.GetPluginCapabilitiesResponse{
 		Capabilities: caps,
 	}, nil
-
 }
 
 // Probe 探针
-func (i *IdentityService) Probe(ctx context.Context, request *csi.ProbeRequest) (*csi.ProbeResponse, error) {
+func (i *IdentityServer) Probe(ctx context.Context, request *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	s := wrappers.BoolValue{Value: true}
 	return &csi.ProbeResponse{
 		Ready: &s,
@@ -59,7 +57,7 @@ func (i *IdentityService) Probe(ctx context.Context, request *csi.ProbeRequest) 
 }
 
 // GetPluginInfo 返回driver的信息
-func (i *IdentityService) GetPluginInfo(ctx context.Context, request *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
+func (i *IdentityServer) GetPluginInfo(ctx context.Context, request *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	if i.myDriver.Name == "" {
 		return nil, status.Error(codes.Unavailable, "Driver name not configured")
 	}

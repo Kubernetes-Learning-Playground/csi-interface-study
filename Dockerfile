@@ -21,8 +21,9 @@ RUN CGO_ENABLED=0 go build \
 
 FROM alpine:3.13
 
-USER nobody
+WORKDIR /app
 
+USER root
 COPY --from=builder --chown=nobody:nobody /app/mycsi .
 
-#ENTRYPOINT ["./mycsi"]
+ENTRYPOINT ["./mycsi"]

@@ -33,12 +33,14 @@ func NewMyDriver(opt *MyDriverOptions) *MyDriver {
 		Endpoint: opt.Endpoint,
 	}
 
-	m.AddControllerServiceCapabilities([]csi.ControllerServiceCapability_RPC_Type{
+	// ControllerService 功能点
+	m.addControllerServerCapabilities([]csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME, //删除和创建volume
 		//csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME, // 包含attach过程
 	})
 
-	m.AddNodeServiceCapabilities([]csi.NodeServiceCapability_RPC_Type{
+	// NodeService 功能点
+	m.addNodeServerCapabilities([]csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 		csi.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 		csi.NodeServiceCapability_RPC_UNKNOWN,
@@ -47,7 +49,7 @@ func NewMyDriver(opt *MyDriverOptions) *MyDriver {
 	return m
 }
 
-func (d *MyDriver) AddControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) {
+func (d *MyDriver) addControllerServerCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) {
 	var csc []*csi.ControllerServiceCapability
 	for _, c := range cl {
 		csc = append(csc, NewControllerServiceCapability(c))
@@ -55,7 +57,7 @@ func (d *MyDriver) AddControllerServiceCapabilities(cl []csi.ControllerServiceCa
 	d.Cscap = csc
 }
 
-func (d *MyDriver) AddNodeServiceCapabilities(nl []csi.NodeServiceCapability_RPC_Type) {
+func (d *MyDriver) addNodeServerCapabilities(nl []csi.NodeServiceCapability_RPC_Type) {
 	var nsc []*csi.NodeServiceCapability
 	for _, n := range nl {
 		nsc = append(nsc, NewNodeServiceCapability(n))
@@ -89,6 +91,7 @@ func NewNodeServiceCapability(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeS
 */
 
 func (d *MyDriver) Start() {
+
 	ctlSvc := NewControllerService(d)
 	identitySvc := NewIdentityService(d)
 	nodeSvc := NewNodeService(d)
